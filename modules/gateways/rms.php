@@ -5,8 +5,8 @@ function rms_config() {
      "FriendlyName" => array("Type" => "System", "Value"=>"Fiuu Online Payment"),
      "merchantid" => array("FriendlyName" => "Fiuu Merchant ID", "Type" => "text", "Size" => "20", ),
      "verifykey" => array("FriendlyName" => "Fiuu Verify Key", "Type" => "text", "Size" => "20", ),
-     "secretkey" => array("FriendlyName" => "Fiuu Secret Key", "Type" => "text", "Size" => "20", )
-	    
+     "secretkey" => array("FriendlyName" => "Fiuu Secret Key", "Type" => "text", "Size" => "20", ),
+	 "extended_vcode" => array("FriendlyName" => "Enable Fiuu Extended Vcode", "Type" => "checkbox" )    
     );
 	return $configarray;
 }
@@ -18,6 +18,7 @@ global $CONFIG;
 	$merchantid = $params['merchantid'];
 	$verifykey = $params['verifykey'];
 	$description = $params['description'];
+	$enableExtendedVcode = $params['extended_vcode'];
 	
 	# Invoice Variables
 	$invoiceid = $params['invoiceid'];
@@ -49,6 +50,9 @@ global $CONFIG;
 	$phone = $params['clientdetails']['phonenumber'];
 	
 	$vkey = md5($amount.$merchantid.$invoiceid.$verifykey);
+	if ($enableExtendedVcode == "on") {
+		$vkey = md5($amount.$merchantid.$invoiceid.$verifykey.$currency);
+	}
 
 	# System Variables	
 	# Enter your code submit to the gateway...
