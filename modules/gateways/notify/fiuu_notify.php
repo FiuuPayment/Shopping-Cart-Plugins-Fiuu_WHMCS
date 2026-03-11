@@ -88,8 +88,39 @@ if ($status=="00") {
 	exit();
     }
     
-    addInvoicePayment($invoiceid,$transid,$amount,$fee,$gatewaymodule);
-    logTransaction($GATEWAY["name"],$_POST,"Successful");
+    // --- BEGIN: Currency Conversion Fix ---
+    // Get the original WHMCS invoice total and user ID
+    $paymentAmount = $amount;
+    $invoiceResult = select_query("tblinvoices", "userid, total", array("id" => $invoiceid));
+    $invoiceData = mysql_fetch_array($invoiceResult);
+    
+    if ($invoiceData) {
+        $invoiceTotal = $invoiceData['total'];
+        $userid = $invoiceData['userid'];
+        
+        // Find the client's currency configuration
+        $clientResult = select_query("tblclients", "currency", array("id" => $userid));
+        $clientData = mysql_fetch_array($clientResult);
+        
+        if ($clientData) {
+            $currencyResult = select_query("tblcurrencies", "code", array("id" => $clientData['currency']));
+            $currencyData = mysql_fetch_array($currencyResult);
+            
+            // Compare WHMCS invoice currency code vs Fiuu's returned currency
+            if ($currencyData && strtoupper($currencyData['code']) != strtoupper($currency)) {
+                // Fiuu converted the amount (e.g., from USD to MYR). 
+                // Since Fiuu confirms it was fully authorized ("00"), 
+                // we bypass the MYR amount and mark the exact original invoice balance as paid.
+                $paymentAmount = $invoiceTotal;
+            }
+        }
+    }
+    // --- END: Currency Conversion Fix ---
+    
+    // Initialize $fee explicitly to prevent PHP uninitialized variable warnings 
+    $fee = 0;
+    addInvoicePayment($invoiceid, $transid, $paymentAmount, $fee, $gatewaymodule);
+    logTransaction($GATEWAY["name"], $_POST, "Successful");
     header('Location: '.$viewinvoice);
 	
 		
