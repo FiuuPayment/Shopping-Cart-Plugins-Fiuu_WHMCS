@@ -1,5 +1,36 @@
 <?php
 
+# Same-site bounce: keep the client logged in after paying.
+# Fiuu returns the customer to this URL with a cross-site POST from pay.fiuu.com. Modern browsers treat the WHMCS
+# session cookie (no SameSite attribute) as SameSite=Lax and do not send it on a cross-site POST, so including
+# init.php here starts a NEW empty session and overwrites the client's login cookie: after a successful payment the
+# client lands on the login page instead of the paid invoice. On that first POST we therefore do not load WHMCS; we
+# re-submit the same fields to this URL from our own origin (a same-site POST, which carries the session cookie) and
+# the existing code below then runs unchanged with the client's session. Payment validation is not modified.
+# Ref: WHMCS developer docs, Payment Gateways > Callback Files (return the visitor via a same-site navigation).
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && empty($_POST['fiuu_bounced'])) {
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('X-Robots-Tag: noindex');
+    $h = function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
+    $fields = '';
+    foreach ($_POST as $k => $v) {
+        if (is_array($v)) { continue; }
+        $fields .= '<input type="hidden" name="' . $h($k) . '" value="' . $h($v) . '">';
+    }
+    $action = $h(strtok($_SERVER['REQUEST_URI'] ?? 'fiuu_return.php', '?'));
+    echo '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="robots" content="noindex">'
+        . '<title>Returning to merchant</title></head>'
+        . '<body style="font-family:sans-serif;text-align:center;padding-top:60px">'
+        . '<form id="fiuuret" method="post" action="' . $action . '">' . $fields
+        . '<input type="hidden" name="fiuu_bounced" value="1">'
+        . '<p>Payment received. Returning you to your account&hellip;</p>'
+        . '<noscript><button type="submit">Continue</button></noscript>'
+        . '</form><script>document.getElementById("fiuuret").submit();</script></body></html>';
+    exit;
+}
+unset($_POST['fiuu_bounced']);
+
 # Required File Includes
 include("../../../init.php");
 include("../../../includes/functions.php");
